@@ -7,7 +7,7 @@ import streamlit as st
 
 
 # =========================================================
-# PAGE CONFIG
+# 1. PAGE CONFIGURATION
 # =========================================================
 st.set_page_config(
     page_title="Housing AI | Price Intelligence",
@@ -18,7 +18,7 @@ st.set_page_config(
 
 
 # =========================================================
-# DESIGN SYSTEM
+# 2. CUSTOM DESIGN
 # =========================================================
 st.markdown(
     """
@@ -30,7 +30,6 @@ st.markdown(
     :root {
         --bg: #080f1d;
         --panel: #101c2e;
-        --panel2: #14243a;
         --border: #263b54;
         --blue: #4da3ff;
         --cyan: #5eead4;
@@ -252,7 +251,6 @@ st.markdown(
     hr {
         border-color: #263b54;
     }
-
     </style>
     """,
     unsafe_allow_html=True,
@@ -260,7 +258,7 @@ st.markdown(
 
 
 # =========================================================
-# LOAD MODEL
+# 3. LOAD TRAINED MODEL
 # =========================================================
 MODEL_PATH = Path(__file__).parent / "best_random_forest.joblib"
 
@@ -268,25 +266,46 @@ MODEL_PATH = Path(__file__).parent / "best_random_forest.joblib"
 @st.cache_resource
 def load_model(path_string):
     saved = joblib.load(path_string)
-    return saved["model"], list(saved["features"])
+
+    if not isinstance(saved, dict):
+        raise ValueError(
+            "The model file must contain a dictionary "
+            "with 'model' and 'features' keys."
+        )
+
+    if "model" not in saved or "features" not in saved:
+        raise ValueError(
+            "The model file must contain 'model' and 'features'."
+        )
+
+    loaded_model = saved["model"]
+    loaded_features = list(saved["features"])
+
+    return loaded_model, loaded_features
 
 
 if not MODEL_PATH.exists():
     st.error(
-        "Model file not found. Put best_random_forest.joblib "
-        "in the same folder as app.py."
+        "Model file not found. Put "
+        "'best_random_forest.joblib' in the same folder as app.py."
     )
     st.stop()
 
 try:
     model, features = load_model(str(MODEL_PATH))
+
 except Exception as exc:
-    st.error(f"Unable to load the model: {exc}")
+    st.error("Unable to load the trained model.")
+    st.code(f"{type(exc).__name__}: {exc}")
+    st.info(
+        "Check the model file and the scikit-learn version "
+        "used when the model was trained."
+    )
     st.stop()
 
 
 # =========================================================
-# HEADER
+# 4. HEADER
 # =========================================================
 st.markdown(
     """
@@ -294,10 +313,9 @@ st.markdown(
         <div class="eyebrow">MACHINE LEARNING • REGRESSION</div>
         <div class="hero-title">Housing Price Intelligence</div>
         <div class="hero-description">
-            A machine-learning workspace for exploring housing data
-            and generating predictions using your trained Random Forest model.
-            Enter the property characteristics, run the model, and review
-            your prediction in one place.
+            Explore housing data and generate predictions using
+            a trained Random Forest model. Enter property
+            characteristics, run the model, and review the result.
         </div>
     </div>
     """,
@@ -306,14 +324,14 @@ st.markdown(
 
 
 # =========================================================
-# OVERVIEW METRICS
+# 5. MODEL OVERVIEW
 # =========================================================
-m1, m2, m3 = st.columns(3)
+col1, col2, col3 = st.columns(3)
 
 overview = [
-    (m1, "MODEL ENGINE", "Random Forest", "Trained regression model"),
-    (m2, "INPUT FEATURES", str(len(features)), "Features expected by model"),
-    (m3, "MODEL STATUS", "Ready", "Saved model loaded successfully"),
+    (col1, "MODEL ENGINE", "Random Forest", "Trained regression model"),
+    (col2, "INPUT FEATURES", str(len(features)), "Features expected by model"),
+    (col3, "MODEL STATUS", "Ready", "Saved model loaded successfully"),
 ]
 
 for col, label, value, caption in overview:
@@ -331,7 +349,7 @@ for col, label, value, caption in overview:
 
 
 # =========================================================
-# SIDEBAR INPUTS
+# 6. SIDEBAR INPUTS
 # =========================================================
 st.sidebar.markdown(
     """
@@ -417,19 +435,19 @@ with st.sidebar:
     st.divider()
 
     predict_button = st.button(
-        "✦  GENERATE PREDICTION",
+        "✦ GENERATE PREDICTION",
         type="primary",
-        use_container_width=True,
+        width="stretch",
     )
 
     reset_button = st.button(
         "Reset result",
-        use_container_width=True,
+        width="stretch",
     )
 
 
 # =========================================================
-# SESSION STATE
+# 7. SESSION STATE
 # =========================================================
 if "prediction_result" not in st.session_state:
     st.session_state.prediction_result = None
@@ -439,10 +457,10 @@ if reset_button:
 
 
 # =========================================================
-# FEATURE ENGINEERING
+# 8. FEATURE ENGINEERING
 # =========================================================
 # IMPORTANT:
-# Confirm these formulas match the exact formulas from training.
+# These formulas must match the original training notebook.
 input_values = {
     "RM": rm,
     "LSTAT": lstat,
@@ -456,10 +474,14 @@ input_values = {
     "NOX": nox,
 }
 
-missing_features = [name for name in features if name not in input_values]
+missing_features = [
+    name for name in features if name not in input_values
+]
 
 if missing_features:
-    st.error(f"Missing required features: {missing_features}")
+    st.error(
+        f"Input values are missing required features: {missing_features}"
+    )
     st.stop()
 
 input_df = pd.DataFrame(
@@ -469,7 +491,7 @@ input_df = pd.DataFrame(
 
 
 # =========================================================
-# MAIN WORKSPACE
+# 9. MAIN WORKSPACE
 # =========================================================
 st.markdown(
     '<div class="section-heading">Prediction Workspace</div>',
@@ -488,11 +510,15 @@ input_tab, result_tab, model_tab = st.tabs(
 )
 
 
+# ---------------------------------------------------------
+# TAB 1: INPUT OVERVIEW
+# ---------------------------------------------------------
 with input_tab:
     st.markdown("#### Feature values")
+
     st.caption(
-        "The table below uses the exact feature names and order "
-        "expected by your saved model."
+        "The table uses the feature names and order expected "
+        "by your saved model."
     )
 
     display_df = input_df.T.reset_index()
@@ -500,7 +526,7 @@ with input_tab:
 
     st.dataframe(
         display_df,
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -513,11 +539,14 @@ with input_tab:
     c.metric("Derived features", 3)
 
     st.info(
-        "The derived columns must be calculated using the same "
-        "feature-engineering formulas used during model training."
+        "Derived features must use the exact formulas from "
+        "the original model training process."
     )
 
 
+# ---------------------------------------------------------
+# TAB 2: PREDICTION RESULT
+# ---------------------------------------------------------
 with result_tab:
     if predict_button:
         try:
@@ -529,7 +558,16 @@ with result_tab:
             }
 
         except Exception as exc:
-            st.error(f"Prediction failed: {exc}")
+            st.session_state.prediction_result = None
+
+            st.error("Prediction failed.")
+            st.code(f"{type(exc).__name__}: {exc}")
+
+            st.warning(
+                "If the error mentions SimpleImputer or a missing "
+                "internal attribute, the saved model may be "
+                "incompatible with the installed scikit-learn version."
+            )
 
     result = st.session_state.prediction_result
 
@@ -539,13 +577,14 @@ with result_tab:
             <div class="info-card">
                 <div class="info-title">Your prediction will appear here</div>
                 <div class="info-text">
-                    Complete the input fields in the sidebar and click
+                    Enter the property details in the sidebar and click
                     GENERATE PREDICTION to run your trained model.
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
+
     else:
         prediction = result["value"]
 
@@ -555,9 +594,9 @@ with result_tab:
                 <div class="result-label">MODEL PREDICTION</div>
                 <div class="result-value">{prediction:,.4f}</div>
                 <div class="result-note">
-                    Predicted target value from your saved Random Forest model.
-                    Interpret its units according to the target variable
-                    used during training.
+                    Predicted target value from your saved Random Forest
+                    model. Interpret its units according to the target
+                    variable used during training.
                 </div>
             </div>
             """,
@@ -567,9 +606,7 @@ with result_tab:
         st.write("")
 
         csv_df = pd.DataFrame(
-            {
-                "Predicted_Value": [prediction],
-            }
+            {"Predicted_Value": [prediction]}
         )
 
         st.download_button(
@@ -577,16 +614,19 @@ with result_tab:
             data=csv_df.to_csv(index=False).encode("utf-8"),
             file_name="housing_prediction.csv",
             mime="text/csv",
-            use_container_width=True,
+            width="stretch",
         )
 
-        with st.expander("View the exact input used for this prediction"):
+        with st.expander("View exact input used for prediction"):
             st.dataframe(
                 result["features"],
-                use_container_width=True,
+                width="stretch",
             )
 
 
+# ---------------------------------------------------------
+# TAB 3: MODEL DETAILS
+# ---------------------------------------------------------
 with model_tab:
     st.markdown("#### Model information")
 
@@ -624,7 +664,7 @@ with model_tab:
             <div class="info-card">
                 <div class="info-title">Expected features</div>
                 <div class="info-text">
-                    {len(features)} input features loaded from the saved artifact.
+                    {len(features)} features loaded from the saved artifact.
                 </div>
             </div>
             """,
@@ -636,9 +676,8 @@ with model_tab:
             <div class="info-card">
                 <div class="info-title">Evaluation metrics</div>
                 <div class="info-text">
-                    R², MAE and RMSE should be reported from your
-                    held-out test evaluation. They are not recalculated
-                    by this interface.
+                    R², MAE and RMSE must come from the held-out
+                    test evaluation. They are not recalculated here.
                 </div>
             </div>
             """,
@@ -650,7 +689,7 @@ with model_tab:
 
 
 # =========================================================
-# FOOTER
+# 10. FOOTER
 # =========================================================
 st.markdown(
     """
